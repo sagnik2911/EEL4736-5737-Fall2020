@@ -1,4 +1,4 @@
-n this design+implementation assignment, you will extend an in-memory file system that is inspired by the design described in Chapter 2 of the textbook. Please refer to the slides posted to Canvas (under Files->Design assignments) for an overview of the implementation.
+In this design+implementation assignment, you will extend an in-memory file system that is inspired by the design described in Chapter 2 of the textbook. Please refer to the slides posted to Canvas (under Files->Design assignments) for an overview of the implementation.
 
 Two Python code files are provided to you: memoryfs.pyPreview the document and memoryfs_shell.pyPreview the document . The memoryfs.py file implements the file system objects described in the overview presentation. The memoryfs_shell.py imports memoryfs, and implements a rudimentary "shell" for interactive access to the file system. You can invoke the shell with:
 
