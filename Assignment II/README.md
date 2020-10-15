@@ -65,25 +65,14 @@ ln target linkname
 ls
 
 - [EEL5737 students only]: extend your ls implementation to have a prefix [refcnt]: for every object, and suffix "/" for directories, e.g:
-
-[cwd=0]:ls
-
-[8]:./
-
-[2]:data/
-
-[3]:foo/
-
-[3]:bar/
-
-[1]:file1.txt
-
-[1]:file2.txt
-
-[1]:file3.txt
-
-[1]:file4.txt
-
- 
+[cwd=0]:ls <br>
+[8]:./ <br>
+[2]:data/ <br>
+[3]:foo/ <br>
+[3]:bar/ <br>
+[1]:file1.txt <br>
+[1]:file2.txt <br>
+[1]:file3.txt <br>
+[1]:file4.txt <br>
 
 Hint: build upon the FileName.Create() method
