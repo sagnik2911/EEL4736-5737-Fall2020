@@ -13,7 +13,7 @@ class FSShell():
 
   # implements cd (change directory)
   def cd(self, dir):
-    i = self.FileObject.Lookup(dir,self.cwd)
+    i = self.FileObject.GeneralPathToInodeNumber(dir,self.cwd)
     if i == -1:
       print ("Error: not found\n")
       return -1
@@ -43,9 +43,9 @@ class FSShell():
         inobj2 = InodeNumber(self.FileObject.RawBlocks, entryinodenumber)
         inobj2.InodeNumberToInode()
         if inobj2.inode.type == INODE_TYPE_DIR:
-          print (entryname.decode() + "/")
+          print ("["+ str(inobj2.inode.refcnt) +"]:"+entryname.decode() + "/")
         else:
-          print (entryname.decode())
+          print ("["+ str(inobj2.inode.refcnt) +"]:"+entryname.decode())
         current_position += FILE_NAME_DIRENTRY_SIZE
       block_index += 1
     return 0
@@ -65,6 +65,55 @@ class FSShell():
     print (data.decode())
     return 0
 
+  # implements ln (link target to name)
+  def ln(self, target, linkname):
+    res = self.FileObject.Link(target,linkname,self.cwd)
+    if res == -1 :
+      print("Error: Specified name to link to is a directory type\n")
+      return -1
+    elif res == -2:
+      print("Error: Specified name already exist in current directory\n")
+      return -1
+    elif res == -3:
+      print("Error: Specified target is not a file\n")
+      return -1
+    return 0
+
+  # implements ln (link target to name)
+  def append(self, filename, string):
+    i = self.FileObject.Lookup(filename,self.cwd)
+    if i == -1:
+      print("Error: File not found\n")
+      return -1
+    inobj = InodeNumber(self.FileObject.RawBlocks, i)
+    inobj.InodeNumberToInode()
+    count = self.FileObject.Write(i, inobj.inode.size, bytearray(string, 'utf-8'))
+    if count == -1:
+      print("Error: String could not be appended\n")
+      return -1
+    print("Bytes Written: " + str(count) + "\n")
+    return 0
+
+  # implement mkdir (create directory under current working directory)
+  def mkdir(self, dirname):
+    if "/" in dirname:
+      print("Error: Specified name contains Slash\n")
+      return -1
+    i = self.FileObject.Create(self.cwd,dirname,INODE_TYPE_DIR)
+    if ( i == -1):
+      print("Error: Couldn't create a directory. Check log for reason.\n")
+    return 0
+
+    # implement create (create file under current working directory)
+  def create(self, filename):
+    if "/" in filename:
+      print("Error: Not a valid filename\n")
+      return -1
+    i = self.FileObject.Create(self.cwd, filename, INODE_TYPE_FILE)
+    if (i == -1):
+      print("Error: Couldn't create a file. Check log for reason.\n")
+    return 0
+
   def Interpreter(self):
     while (True):
       command = input("[cwd=" + str(self.cwd) + "]:")
@@ -81,6 +130,26 @@ class FSShell():
           self.cat(splitcmd[1])
       elif splitcmd[0] == "ls":
         self.ls()
+      elif splitcmd[0] == "ln":
+        if len(splitcmd) != 3:
+          print("Error: ln requires two arguments")
+        else:
+          self.ln(splitcmd[1],splitcmd[2])
+      elif splitcmd[0] == "append":
+        if len(splitcmd) != 3:
+          print("Error: append requires two arguments")
+        else:
+          self.append(splitcmd[1],splitcmd[2])
+      elif splitcmd[0] == "mkdir":
+        if len(splitcmd) != 2:
+          print("Error: mkdir requires two arguments")
+        else:
+          self.mkdir(splitcmd[1])
+      elif splitcmd[0] == "create":
+        if len(splitcmd) != 2:
+          print("Error: create requires two arguments")
+        else:
+          self.create(splitcmd[1])
       elif splitcmd[0] == "exit":
         return
       else:
@@ -111,4 +180,5 @@ if __name__ == "__main__":
 
   myshell = FSShell(FileObject)
   myshell.Interpreter()
+  RawBlocks.DumpToDisk(UUID) #Write in doc#
 
