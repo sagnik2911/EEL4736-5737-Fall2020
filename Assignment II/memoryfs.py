@@ -429,61 +429,6 @@ class FileName():
 
     return block[string_start:string_end]
 
-  def PathToInodeNumber(self, path, dir):
-    if self.PlainName(path) :
-      return self.NameToInodeNumber(path,dir)
-    else :
-      dir = self.Lookup(self.First(path),dir)
-      path = self.Rest(path)
-      return self.PathToInodeNumber(path,dir)
-
-  def First(self,path):
-    delimetedPath = path.split("/")
-    logging.debug('HelperGetDirectoryPathFirst: ' + delimetedPath[0])
-    return delimetedPath[0]
-
-  def Rest(self,path):
-    delimetedPath = path.split("/", 1)
-    logging.debug('DirectoryPathRest: ' + delimetedPath[1])
-    return delimetedPath[1]
-
-  def GeneralPathToInodeNumber(self, path, cwd):
-    if path[0] == "/" :
-      return self.PathToInodeNumber(path[1:len(path)],0)
-    else :
-      return self.PathToInodeNumber(path,cwd)
-
-
-  def PlainName(self, path):
-    if "/" not in path:
-      return True
-    return False
-
-  def NameToInodeNumber(self, filename, dir):
-    return self.Lookup(filename,dir)
-
-  def Link(self, target, name, cwd):
-    logging.debug('LinkFilenameTarget: ' + str(name) + ' to ' + str(target))
-    if "/" in name :
-      logging.debug("Link: given name is not a file name" + str(name))
-      return -1
-    elif self.Lookup(name,cwd) != -1 :
-      logging.debug("Link: given name already exist in current directory" + str(name))
-      return -2
-    else:
-      i = self.GeneralPathToInodeNumber(target,cwd)
-      inobj = InodeNumber(self.RawBlocks, i)
-      inobj.InodeNumberToInode()
-      if inobj.inode.type != INODE_TYPE_FILE:
-        logging.debug("Link: given target is not a file" + str(name))
-        return -3
-      else:
-        dir_inode = InodeNumber(self.RawBlocks,cwd)
-        dir_inode.InodeNumberToInode()
-        self.InsertFilenameInodeNumber(dir_inode,name,i)
-        inobj.inode.refcnt += 1
-        inobj.StoreInode()
-        return 0
 
 ## This helper function extracts an inode number from a directory data block
 ## The index selects which entry to extract within the block - e.g. index 0 is the inode for the first file name, 1 second file name
@@ -946,3 +891,76 @@ class FileName():
     return read_block
 
 
+  def PathToInodeNumber(self, path, dir):
+
+    logging.debug ("PathToInodeNumber: path: " + str(path) + ", dir: " + str(dir))
+
+    if "/" in path:
+      split_path = path.split("/")
+      first = split_path[0]
+      del split_path[0]
+      rest = "/".join(split_path)
+      logging.debug ("PathToInodeNumber: first: " + str(first) + ", rest: " + str(rest))
+      d = self.Lookup(first, dir)
+      return self.PathToInodeNumber(rest, d)
+    else:
+      return self.Lookup(path, dir)
+
+
+  def GeneralPathToInodeNumber(self, path, cwd):
+
+    logging.debug ("GeneralPathToInodeNumber: path: " + str(path) + ", cwd: " + str(cwd))
+
+    if path[0] == "/":
+      if len(path) == 1: # special case: root
+        return 0
+      cut_path = path[1:len(path)]
+      logging.debug ("GeneralPathToInodeNumber: cut_path: " + str(cut_path))
+      return self.PathToInodeNumber(cut_path,0)
+    else:
+      return self.PathToInodeNumber(path,cwd)
+
+
+  def Link(self, target, name, cwd):
+
+    logging.debug ("Link: target: " + str(target) + ", name: " + str(name) + ", cwd: " + str(cwd))
+
+    target_inode_number = self.GeneralPathToInodeNumber(target, cwd)
+    if target_inode_number == -1:
+      logging.debug ("Link: target does not exist")
+      return -1
+
+    cwd_inode = InodeNumber(self.RawBlocks, cwd)
+    cwd_inode.InodeNumberToInode()
+    if cwd_inode.inode.type != INODE_TYPE_DIR:
+      logging.debug ("Link: cwd is not a directory")
+      return -1
+
+    # Find available slot in directory data block
+    fileentry_position = self.FindAvailableFileEntry(cwd)
+    if fileentry_position == -1:
+      logging.debug ("Link: no entry available for another link")
+      return -1
+
+    # Ensure it's not a duplicate - if Lookup returns anything other than -1
+    if self.Lookup(name, cwd) != -1:
+      logging.debug ("Link: name already exists")
+      return -1
+
+    # Ensure target is a file 
+    target_obj = InodeNumber(self.RawBlocks, target_inode_number)
+    target_obj.InodeNumberToInode()
+    if target_obj.inode.type != INODE_TYPE_FILE:
+      logging.debug ("Link: target must be a file")
+      return -1
+
+    # Add to directory (filename,inode) table
+    self.InsertFilenameInodeNumber(cwd_inode, name, target_inode_number)
+
+    # Update refcnt of target and write to file system
+    target_inode_number_object = InodeNumber(self.RawBlocks, target_inode_number)
+    target_inode_number_object.InodeNumberToInode()
+    target_inode_number_object.inode.refcnt += 1
+    target_inode_number_object.StoreInode()
+
+    return 0
