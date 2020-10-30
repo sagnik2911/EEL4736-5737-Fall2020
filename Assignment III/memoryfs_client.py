@@ -397,64 +397,6 @@ class FileName():
 
         return block[string_start:string_end]
 
-<<<<<<< HEAD
-=======
-    def PathToInodeNumber(self, path, dir):
-        if self.PlainName(path):
-            return self.NameToInodeNumber(path, dir)
-        else:
-            dir = self.Lookup(self.First(path), dir)
-            path = self.Rest(path)
-            return self.PathToInodeNumber(path, dir)
-
-    def First(self, path):
-        delimetedPath = path.split("/")
-        logging.debug('HelperGetDirectoryPathFirst: ' + delimetedPath[0])
-        return delimetedPath[0]
-
-    def Rest(self, path):
-        delimetedPath = path.split("/", 1)
-        logging.debug('DirectoryPathRest: ' + delimetedPath[1])
-        return delimetedPath[1]
-
-    def GeneralPathToInodeNumber(self, path, cwd):
-        if path[0] == "/":
-            return self.PathToInodeNumber(path[1:len(path)], 0)
-        else:
-            return self.PathToInodeNumber(path, cwd)
-
-    def PlainName(self, path):
-        if "/" not in path:
-            return True
-        return False
-
-    def NameToInodeNumber(self, filename, dir):
-        return self.Lookup(filename, dir)
-
-    def Link(self, target, name, cwd):
-        logging.debug('LinkFilenameTarget: ' + str(name) + ' to ' + str(target))
-        if "/" in name:
-            logging.debug("Link: given name is not a file name" + str(name))
-            return -1
-        elif self.Lookup(name, cwd) != -1:
-            logging.debug("Link: given name already exist in current directory" + str(name))
-            return -2
-        else:
-            i = self.GeneralPathToInodeNumber(target, cwd)
-            inobj = InodeNumber(self.RawBlocks, i)
-            inobj.InodeNumberToInode()
-            if inobj.inode.type != INODE_TYPE_FILE:
-                logging.debug("Link: given target is not a file" + str(name))
-                return -3
-            else:
-                dir_inode = InodeNumber(self.RawBlocks, cwd)
-                dir_inode.InodeNumberToInode()
-                self.InsertFilenameInodeNumber(dir_inode, name, i)
-                inobj.inode.refcnt += 1
-                inobj.StoreInode()
-                return 0
-
->>>>>>> 38efe72c7f11575c8c0017ea8edc70ddce5b6a08
     ## This helper function extracts an inode number from a directory data block
     ## The index selects which entry to extract within the block - e.g. index 0 is the inode for the first file name, 1 second file name
 
@@ -913,7 +855,6 @@ class FileName():
 
             logging.debug('Read: current_offset: ' + str(current_offset) + ' , bytes_read: ' + str(bytes_read))
 
-<<<<<<< HEAD
         return read_block
 
     def PathToInodeNumber(self, path, dir):
@@ -987,6 +928,3 @@ class FileName():
         target_inode_number_object.StoreInode()
 
         return 0
-=======
-        return read_block
->>>>>>> 38efe72c7f11575c8c0017ea8edc70ddce5b6a08
