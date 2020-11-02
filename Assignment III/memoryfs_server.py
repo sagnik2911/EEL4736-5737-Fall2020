@@ -28,6 +28,13 @@ if __name__ == "__main__":
 
   server.register_function(Get, 'Get')
 
+  def ReadSetBlock(block_number, data):
+    r = block[block_number]
+    block[block_number] = data
+    return r
+
+  server.register_function(ReadSetBlock, 'RSB')
+
   # Run the server's main loop
   server.serve_forever()
 

@@ -1,3 +1,4 @@
+import time
 import xmlrpc.client
 import pickle, logging
 
@@ -68,11 +69,29 @@ INODE_TYPE_FILE = 1
 INODE_TYPE_DIR = 2
 INODE_TYPE_SYM = 3
 
+#ReadAndSetMemoryConstants
+RSM_BLOCK_NUM = 0
+LIST_OF_ONE = [1 for i in range (0,BLOCK_SIZE)]
+LOCK_VALUE = bytearray(LIST_OF_ONE)
+UNLOCK_VALUE = bytearray(BLOCK_SIZE)
+
 #### BLOCK LAYER RPC
 
 class DiskBlocks():
     def __init__(self):
         self.s = xmlrpc.client.ServerProxy('http://localhost:8000', use_builtin_types=True)
+
+    ## Acquire: The procedure puts the client in waiting for lock
+    def Acquire(self, lock_reference):
+        lock_val = self.s.RSB(lock_reference,LOCK_VALUE)
+        while lock_val==LOCK_VALUE:
+            lock_val = self.s.RSB(lock_reference, LOCK_VALUE)
+        return
+
+    ## Release: The procedure releases the client of the lock
+    def Release(self, lock_reference):
+        self.s.RSB(lock_reference, UNLOCK_VALUE)
+        return
 
     ## Put: interface to write a raw block of data to the block indexed by block number
     ## Blocks are padded with zeroes up to BLOCK_SIZE
@@ -121,7 +140,8 @@ class DiskBlocks():
     ## Initialize blocks, either from a clean slate (cleanslate == True), or from a pickled dump file with prefix
 
     def InitializeBlocks(self, cleanslate, prefix):
-
+        logging.debug("Acquiring Lock")
+        self.Acquire(RSM_BLOCK_NUM)
         if cleanslate:
             # Block 0: No real boot code here, just write the given prefix
             self.Put(0, prefix)
@@ -141,6 +161,8 @@ class DiskBlocks():
                 self.Put(i, zeroblock)
         else:
             self.LoadFromDisk(prefix)
+        logging.debug("Releasing Lock")
+        self.Release(RSM_BLOCK_NUM)
 
     ## Prints out file system information
 
@@ -181,8 +203,12 @@ class DiskBlocks():
 
     def PrintBlocks(self, tag, min, max):
         logging.info('#### Raw disk blocks: ' + tag)
+        logging.debug("Acquiring Lock")
+        self.Acquire(RSM_BLOCK_NUM)
         for i in range(min, max):
             logging.info('Block [' + str(i) + '] : ' + str((self.Get(i)).hex()))
+        logging.debug("Releasing Lock")
+        self.Release(RSM_BLOCK_NUM)
 
 
 #### INODE LAYER
@@ -306,7 +332,6 @@ class InodeNumber():
 
     def InodeNumberToInode(self):
         logging.debug('InodeNumberToInode: ' + str(self.inode_number))
-
         # locate which block has the inode we want
         raw_block_number = INODE_BLOCK_OFFSET + ((self.inode_number * INODE_SIZE) // BLOCK_SIZE)
 
@@ -352,7 +377,6 @@ class InodeNumber():
         # Update slice of block with this inode's bytearray
         tempblock[start:end] = inode_bytearray
         logging.debug('StoreInode: tempblock:\n' + str(tempblock.hex()))
-
         # Update raw storage with new inode
         self.RawBlocks.Put(raw_block_number, tempblock)
 
@@ -484,6 +508,7 @@ class FileName():
         inode_number = InodeNumber(self.RawBlocks, dir)
         inode_number.InodeNumberToInode()
 
+
         if inode_number.inode.type != INODE_TYPE_DIR:
             logging.error("Lookup: not a directory inode: " + str(dir) + " , " + str(inode_number.inode.type))
             return -1
@@ -493,10 +518,8 @@ class FileName():
 
         # Iterate over all data blocks indexed by directory inode, until we reach inode's size
         while offset < inode_number.inode.size:
-
             # Retrieve directory data block given current offset
             b = inode_number.InodeNumberToBlock(offset)
-
             # A directory data block has multiple (filename,inode) entries
             # Iterate over file entries to search for matches
             for i in range(0, FILE_ENTRIES_PER_DATA_BLOCK):
@@ -525,7 +548,6 @@ class FileName():
 
             # Skip to the next block, back to while loop
             offset += BLOCK_SIZE
-
         logging.debug("Lookup: file not found: " + str(filename) + " in " + str(dir))
         return -1
 
@@ -575,7 +597,6 @@ class FileName():
 
         # Scan through all available data blocks
         for block_number in range(DATA_BLOCKS_OFFSET, TOTAL_NUM_BLOCKS):
-
             # GET() raw block that stores the bitmap entry for block_number
             bitmap_block = FREEBITMAP_BLOCK_OFFSET + (block_number // BLOCK_SIZE)
             block = self.RawBlocks.Get(bitmap_block)
@@ -744,7 +765,6 @@ class FileName():
             # the first time around in the loop, this may not be aligned with block boundary (i.e. 0) depending on offset
             # in subsequent iterations, it will be 0
             write_start = current_offset % BLOCK_SIZE
-
             # determine byte position where the writing ends
             # this may be BLOCK_SIZE if the data yet to be written spills over to the next block
             # or, it may be smaller than BLOCK_SIZE if the data ends in this block
@@ -773,10 +793,9 @@ class FileName():
 
             # copy slice of data into the right position in the block
             block[write_start:write_end] = data[bytes_written:bytes_written + (write_end - write_start)]
-
             # now write modified block back to disk
             file_inode.RawBlocks.Put(block_number, block)
-
+            time.sleep(4)
             # update offset, bytes written
             current_offset += write_end - write_start
             bytes_written += write_end - write_start
@@ -791,7 +810,6 @@ class FileName():
         return bytes_written
 
     def Read(self, file_inode_number, offset, count):
-
         logging.debug(
             "Read: file_inode_number: " + str(file_inode_number) + ", offset: " + str(offset) + ", count: " + str(
                 count))
@@ -817,7 +835,6 @@ class FileName():
             bytes_to_read = count
 
         read_block = bytearray(bytes_to_read)
-
         # this loop iterates through one or more blocks, ending when all data is read
         while bytes_read < bytes_to_read:
 
@@ -854,7 +871,6 @@ class FileName():
             current_offset += read_end - read_start
 
             logging.debug('Read: current_offset: ' + str(current_offset) + ' , bytes_read: ' + str(bytes_read))
-
         return read_block
 
     def PathToInodeNumber(self, path, dir):

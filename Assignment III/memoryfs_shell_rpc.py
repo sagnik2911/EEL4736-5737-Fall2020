@@ -13,12 +13,16 @@ class FSShell():
 
   # implements cd (change directory)
   def cd(self, dir):
+    logging.debug("Acquiring Lock")
+    self.FileObject.RawBlocks.Acquire(RSM_BLOCK_NUM)
     i = self.FileObject.GeneralPathToInodeNumber(dir,self.cwd)
     if i == -1:
       print ("Error: not found\n")
       return -1
     inobj = InodeNumber(self.FileObject.RawBlocks,i)
     inobj.InodeNumberToInode()
+    logging.debug("Releasing Lock")
+    self.FileObject.RawBlocks.Release(RSM_BLOCK_NUM)
     if inobj.inode.type != INODE_TYPE_DIR:
       print ("Error: not a directory\n")
       return -1
@@ -26,6 +30,8 @@ class FSShell():
 
   # implements ls (lists files in directory)
   def ls(self):
+    logging.debug("Acquiring Lock")
+    self.FileObject.RawBlocks.Acquire(RSM_BLOCK_NUM)
     inobj = InodeNumber(self.FileObject.RawBlocks, self.cwd)
     inobj.InodeNumberToInode()
     block_index = 0
@@ -48,10 +54,14 @@ class FSShell():
           print ("["+ str(inobj2.inode.refcnt) +"]:"+entryname.decode())
         current_position += FILE_NAME_DIRENTRY_SIZE
       block_index += 1
+    logging.debug("Releasing Lock")
+    self.FileObject.RawBlocks.Release(RSM_BLOCK_NUM)
     return 0
 
   # implements cat (print file contents)
   def cat(self, filename):
+    logging.debug("Acquiring Lock")
+    self.FileObject.RawBlocks.Acquire(RSM_BLOCK_NUM)
     i = self.FileObject.Lookup(filename, self.cwd)
     if i == -1:
       print ("Error: not found\n")
@@ -62,12 +72,18 @@ class FSShell():
       print ("Error: not a file\n")
       return -1
     data = self.FileObject.Read(i, 0, MAX_FILE_SIZE)
+    logging.debug("Releasing Lock")
+    self.FileObject.RawBlocks.Release(RSM_BLOCK_NUM)
     print (data.decode())
     return 0
 
   # implements ln (link target to name)
   def ln(self, target, linkname):
+    logging.debug("Acquiring Lock")
+    self.FileObject.RawBlocks.Acquire(RSM_BLOCK_NUM)
     res = self.FileObject.Link(target,linkname,self.cwd)
+    logging.debug("Releasing Lock")
+    self.FileObject.RawBlocks.Release(RSM_BLOCK_NUM)
     if res == -1 :
       print("Error: Specified name to link to is a directory type\n")
       return -1
@@ -81,6 +97,8 @@ class FSShell():
 
   # implements ln (link target to name)
   def append(self, filename, string):
+    logging.debug("Acquiring Lock")
+    self.FileObject.RawBlocks.Acquire(RSM_BLOCK_NUM)
     i = self.FileObject.Lookup(filename,self.cwd)
     if i == -1:
       print("Error: File not found\n")
@@ -88,6 +106,8 @@ class FSShell():
     inobj = InodeNumber(self.FileObject.RawBlocks, i)
     inobj.InodeNumberToInode()
     count = self.FileObject.Write(i, inobj.inode.size, bytearray(string, 'utf-8'))
+    logging.debug("Releasing Lock")
+    self.FileObject.RawBlocks.Release(RSM_BLOCK_NUM)
     if count == -1:
       print("Error: String could not be appended\n")
       return -1
@@ -99,7 +119,11 @@ class FSShell():
     if "/" in dirname:
       print("Error: Specified name contains Slash\n")
       return -1
+    logging.debug("Acquiring Lock")
+    self.FileObject.RawBlocks.Acquire(RSM_BLOCK_NUM)
     i = self.FileObject.Create(self.cwd,dirname,INODE_TYPE_DIR)
+    logging.debug("Releasing Lock")
+    self.FileObject.RawBlocks.Release(RSM_BLOCK_NUM)
     if ( i == -1):
       print("Error: Couldn't create a directory. Check log for reason.\n")
     return 0
@@ -109,7 +133,11 @@ class FSShell():
     if "/" in filename:
       print("Error: Not a valid filename\n")
       return -1
+    logging.debug("Acquiring Lock")
+    self.FileObject.RawBlocks.Acquire(RSM_BLOCK_NUM)
     i = self.FileObject.Create(self.cwd, filename, INODE_TYPE_FILE)
+    logging.debug("Releasing Lock")
+    self.FileObject.RawBlocks.Release(RSM_BLOCK_NUM)
     if (i == -1):
       print("Error: Couldn't create a file. Check log for reason.\n")
     return 0
